@@ -1,0 +1,12 @@
+# .golangci.yml
+version: "2"
+
+linters:
+  enable:
+    - misspell     # English spelling
+    - unconvert    # redundant type conversions
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
