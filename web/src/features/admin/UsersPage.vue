@@ -24,6 +24,7 @@ import {
 } from "../identity/store";
 import { useRoute } from "vue-router";
 import UserAvatar from "../../shared/UserAvatar.vue";
+import AvatarEditor from "../media/AvatarEditor.vue";
 const route = useRoute();
 const counts = ref<{
   users_total: number;
@@ -31,6 +32,9 @@ const counts = ref<{
   admins_total: number;
   users_disabled: number;
 }>();
+const avatarEditor = ref<InstanceType<typeof AvatarEditor>>();
+const avatarChange = ref<string | null>();
+const avatarProcessing = ref(false);
 const identity = useIdentity();
 const users = ref<User[]>([]);
 const total = ref(0);
@@ -98,6 +102,8 @@ function clearPassword() {
   form.confirm = "";
 }
 function createUser() {
+  avatarEditor.value?.reset();
+  avatarChange.value = undefined;
   mode.value = "create";
   target.value = undefined;
   Object.assign(form, {
@@ -113,6 +119,8 @@ function createUser() {
 async function edit(user: User, password = false) {
   try {
     const r = await request<User>(`/admin/users/${user.id}`);
+    avatarEditor.value?.reset();
+    avatarChange.value = undefined;
     target.value = r.data;
     etag.value = r.etag;
     mode.value = password ? "password" : "edit";
@@ -130,7 +138,7 @@ async function edit(user: User, password = false) {
   }
 }
 async function save() {
-  if (busy.value) return;
+  if (busy.value || avatarProcessing.value) return;
   dialogError.value = "";
   if (mode.value !== "edit") {
     dialogError.value = validatePassword(form.password);
@@ -148,6 +156,9 @@ async function save() {
           display_name: form.display_name,
           role: form.role,
           password: form.password,
+          ...(avatarChange.value !== undefined
+            ? { avatar_upload_id: avatarChange.value }
+            : {}),
         },
       });
     else if (mode.value === "password")
@@ -160,8 +171,15 @@ async function save() {
       await request(`/admin/users/${target.value!.id}`, {
         method: "PATCH",
         etag: etag.value,
-        body: { username: form.username, display_name: form.display_name },
+        body: {
+          username: form.username,
+          display_name: form.display_name,
+          ...(avatarChange.value !== undefined
+            ? { avatar_upload_id: avatarChange.value }
+            : {}),
+        },
       });
+    avatarEditor.value?.saved();
     clearPassword();
     dialog.value = false;
     ElMessage.success(
@@ -486,26 +504,28 @@ onUnmounted(clearPassword);
             : '编辑用户'
       "
       width="560px"
-      :close-on-click-modal="!busy"
-      :close-on-press-escape="!busy"
-      :show-close="!busy"
-      @closed="clearPassword"
+      :close-on-click-modal="!busy && !avatarProcessing"
+      :close-on-press-escape="!busy && !avatarProcessing"
+      :show-close="!busy && !avatarProcessing"
+      @closed="
+        clearPassword();
+        avatarEditor?.reset();
+        avatarChange = undefined;
+      "
     >
       <div v-if="dialogError" class="error-banner" role="alert">
         {{ dialogError }}
       </div>
       <ElForm label-position="top" :disabled="busy" @submit.prevent="save">
         <template v-if="mode !== 'password'">
-          <div class="avatar-editor">
-            <span class="avatar large"><UiIcon name="user" /></span>
-            <div class="avatar-editor-controls">
-              <h3>用户头像</h3>
-              <ElButton disabled title="头像上传与裁剪将在后续迭代中接入"
-                >上传头像</ElButton
-              >
-              <p class="field-hint">头像上传与裁剪功能将在后续迭代中接入。</p>
-            </div>
-          </div>
+          <AvatarEditor
+            ref="avatarEditor"
+            v-model="avatarChange"
+            :avatar="target?.avatar"
+            :founder="target?.is_founder"
+            :disabled="busy"
+            @processing="avatarProcessing = $event"
+          />
           <div class="form-row spaced">
             <ElFormItem label="显示名称" required
               ><ElInput
@@ -569,12 +589,13 @@ onUnmounted(clearPassword);
           </div></template
         >
         <footer class="form-footer">
-          <ElButton :disabled="busy" @click="dialog = false">取消</ElButton
+          <ElButton :disabled="busy || avatarProcessing" @click="dialog = false"
+            >取消</ElButton
           ><ElButton
             type="primary"
             native-type="submit"
             :loading="busy"
-            :disabled="busy"
+            :disabled="busy || avatarProcessing"
             >{{ mode === "create" ? "创建用户" : "保存" }}</ElButton
           >
         </footer>

@@ -50,10 +50,6 @@ func (c *apiClient) call(t *testing.T, method, path string, body any, expected i
 }
 func (c *apiClient) send(t *testing.T, method, path string, body any, headers map[string]string) *httptest.ResponseRecorder {
 	t.Helper()
-	if method != "GET" && c.csrf == "" {
-		r := c.call(t, "GET", "/auth/csrf", nil, 200, nil)
-		c.csrf = r["data"].(map[string]any)["csrf_token"].(string)
-	}
 	var data []byte
 	if body != nil {
 		var err error
@@ -62,11 +58,19 @@ func (c *apiClient) send(t *testing.T, method, path string, body any, headers ma
 			t.Fatal(err)
 		}
 	}
+	return c.sendBytes(t, method, path, data, "application/json", headers)
+}
+func (c *apiClient) sendBytes(t *testing.T, method, path string, data []byte, contentType string, headers map[string]string) *httptest.ResponseRecorder {
+	t.Helper()
+	if method != "GET" && c.csrf == "" {
+		r := c.call(t, "GET", "/auth/csrf", nil, 200, nil)
+		c.csrf = r["data"].(map[string]any)["csrf_token"].(string)
+	}
 	req := httptest.NewRequest(method, "http://octodcp.test/api/v1"+path, bytes.NewReader(data))
 	req.RemoteAddr = c.address
 	if method != "GET" {
 		req.Header.Set("Origin", "http://octodcp.test")
-		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Type", contentType)
 		req.Header.Set("X-CSRF-Token", c.csrf)
 	}
 	for _, cookie := range c.cookies {
@@ -285,4 +289,5 @@ func TestHTTPIdentityLifecycle(t *testing.T) {
 	if err = backend.db.GetContext(context.Background(), &count, "SELECT COUNT(*) FROM system_instance WHERE founder_user_id=?", founderID); err != nil || count != 1 {
 		t.Fatal("founder identity changed", err)
 	}
+	t.Run("AvatarAndAudit", func(t *testing.T) { testHTTPAvatarAudit(t, backend, h, founder, dataDir, founderID) })
 }

@@ -1,10 +1,15 @@
 package identity
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"strconv"
 	"time"
 
+	"github.com/ravenmk2/octodcp/internal/platform/httpx"
+
+	"github.com/ravenmk2/octodcp/internal/modules/audit"
 	"github.com/ravenmk2/octodcp/internal/modules/settings"
 )
 
@@ -80,15 +85,59 @@ type LoginResult struct {
 	Auth  *Auth
 	Token string
 }
+type AvatarPatch struct {
+	Present bool
+	ID      *uint64
+}
+
+func (p AvatarPatch) IsZero() bool { return !p.Present }
+func (p AvatarPatch) MarshalJSON() ([]byte, error) {
+	if p.ID == nil {
+		return []byte("null"), nil
+	}
+	return json.Marshal(strconv.FormatUint(*p.ID, 10))
+}
+func (p *AvatarPatch) UnmarshalJSON(data []byte) error {
+	data = bytes.TrimSpace(data)
+	p.Present = true
+	p.ID = nil
+	if string(data) == "null" {
+		return nil
+	}
+	var raw string
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return httpx.Invalid("avatar_upload_id", "invalid_format")
+	}
+	id, err := strconv.ParseUint(raw, 10, 64)
+	if err != nil || id == 0 || strconv.FormatUint(id, 10) != raw {
+		return httpx.Invalid("avatar_upload_id", "invalid_format")
+	}
+	p.ID = &id
+	return nil
+}
+
+type Avatar struct {
+	ID         uint64     `db:"id"`
+	Key        string     `db:"storage_key"`
+	Hash       []byte     `db:"sha256"`
+	Size       int        `db:"size_bytes"`
+	UploaderID uint64     `db:"uploaded_by_user_id"`
+	State      string     `db:"state"`
+	ExpiresAt  *time.Time `db:"expires_at"`
+	OrphanedAt *time.Time `db:"orphaned_at"`
+	CreatedAt  time.Time  `db:"created_at"`
+}
 type CreateRequest struct {
-	Username    string `json:"username"`
-	DisplayName string `json:"display_name"`
-	Role        string `json:"role"`
-	Password    string `json:"password"`
+	Avatar      AvatarPatch `json:"avatar_upload_id,omitzero"`
+	Username    string      `json:"username"`
+	DisplayName string      `json:"display_name"`
+	Role        string      `json:"role"`
+	Password    string      `json:"password"`
 }
 type ProfilePatch struct {
-	Username    *string `json:"username,omitempty"`
-	DisplayName *string `json:"display_name,omitempty"`
+	Avatar      AvatarPatch `json:"avatar_upload_id,omitzero"`
+	Username    *string     `json:"username,omitempty"`
+	DisplayName *string     `json:"display_name,omitempty"`
 }
 type SettingsPatch struct {
 	Name         *string `json:"site_name,omitempty"`
@@ -116,6 +165,15 @@ type Tx interface {
 	UpdateLogin(uint64, time.Time) error
 	SaveSetting(string, json.RawMessage, time.Time) error
 	OrphanAvatar(uint64, time.Time) error
+	Avatars([]uint64, bool) (map[uint64]*Avatar, error)
+	InsertAvatar(*Avatar) error
+	AttachAvatar(uint64) error
+	DeleteAvatar(uint64) error
+	AvatarOwner(uint64) (uint64, error)
+	ExpiredAvatars(time.Time, int) ([]Avatar, error)
+	AvatarKeyExists(string) (bool, error)
+	AuditEvents(audit.Filter) ([]Event, error)
+	AuditEvent(uint64) (*Event, error)
 	Audit(Event) error
 	ListUsers(Filter) ([]User, int, error)
 	Counts() (Counts, error)

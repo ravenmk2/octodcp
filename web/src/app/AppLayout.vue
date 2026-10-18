@@ -96,6 +96,16 @@ async function userCommand(command: string | number | object) {
               >系统设置</span
             ></RouterLink
           >
+          <RouterLink
+            class="nav-item"
+            title="审计日志"
+            aria-label="审计日志"
+            to="/admin/audit"
+            :class="{ active: route.path === '/admin/audit' }"
+            ><UiIcon name="log" /><span class="nav-text"
+              >审计日志</span
+            ></RouterLink
+          >
         </template>
         <template v-else>
           <RouterLink

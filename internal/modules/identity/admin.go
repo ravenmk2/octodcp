@@ -51,76 +51,93 @@ func (s *Service) CreateUser(ctx context.Context, raw string, r CreateRequest, m
 		if e != nil {
 			return e
 		}
-		return s.audit(tx, a.User, "user.created", "user", strconv.FormatUint(user.ID, 10), user.DisplayName, meta, map[string]any{"role": r.Role})
+		changed, e := s.bindAvatar(tx, a.User, user, r.Avatar)
+		if e != nil {
+			return e
+		}
+		if changed {
+			if e = tx.SaveUser(user); e != nil {
+				return e
+			}
+		}
+		if e = s.audit(tx, a.User, "user.created", "user", strconv.FormatUint(user.ID, 10), user.DisplayName, meta, map[string]any{"role": r.Role}); e != nil {
+			return e
+		}
+		if changed {
+			return s.avatarAudit(tx, a.User, user, meta)
+		}
+		return nil
 	})
 	return user, a, err
 }
 func (s *Service) UpdateUser(ctx context.Context, raw string, id uint64, etag string, patch ProfilePatch, meta Metadata) (*User, *Auth, error) {
 	var result *User
 	a, err := s.execute(ctx, raw, policy{admin: true, renew: true}, id, func(tx Tx, a *Auth, u *User) error {
-		if err := protect(a, u, "profile"); err != nil {
-			return err
+		if e := protect(a, u, "profile"); e != nil {
+			return e
 		}
-		if err := checkVersion(etag, u); err != nil {
-			return err
-		}
-		if patch.Username == nil && patch.DisplayName == nil {
-			return httpx.Invalid("body", "empty_patch")
-		}
-		changes := map[string]any{}
-		if patch.Username != nil {
-			if !usernamePattern.MatchString(*patch.Username) {
-				return httpx.Invalid("username", "invalid_format")
-			}
-			if u.Username != *patch.Username {
-				changes["username"] = map[string]string{"before": u.Username, "after": *patch.Username}
-				u.Username = *patch.Username
-			}
-		}
-		if patch.DisplayName != nil {
-			name := strings.TrimSpace(*patch.DisplayName)
-			if err := validateName(name, "display_name", 30); err != nil {
-				return err
-			}
-			if u.DisplayName != name {
-				changes["display_name"] = map[string]string{"before": u.DisplayName, "after": name}
-				u.DisplayName = name
-			}
+		if e := checkVersion(etag, u); e != nil {
+			return e
 		}
 		result = u
-		if len(changes) == 0 {
-			return nil
-		}
-		if err := s.bump(tx, u, false); err != nil {
-			return err
-		}
-		return s.audit(tx, a.User, "user.profile_updated", "user", strconv.FormatUint(u.ID, 10), u.DisplayName, meta, map[string]any{"changes": changes})
+		return s.updateProfile(tx, a, u, patch, meta)
 	})
 	return result, a, err
 }
-func (s *Service) UpdateAccount(ctx context.Context, raw, etag, name string, meta Metadata) (*User, *Auth, error) {
+func (s *Service) UpdateAccount(ctx context.Context, raw, etag string, patch ProfilePatch, meta Metadata) (*User, *Auth, error) {
 	var result *User
 	a, err := s.execute(ctx, raw, policy{renew: true}, 0, func(tx Tx, a *Auth, _ *User) error {
-		u := a.User
-		if err := checkVersion(etag, u); err != nil {
-			return err
+		if e := checkVersion(etag, a.User); e != nil {
+			return e
 		}
-		name = strings.TrimSpace(name)
+		result = a.User
+		return s.updateProfile(tx, a, a.User, patch, meta)
+	})
+	return result, a, err
+}
+func (s *Service) updateProfile(tx Tx, a *Auth, u *User, patch ProfilePatch, meta Metadata) error {
+	if patch.Username == nil && patch.DisplayName == nil && !patch.Avatar.Present {
+		return httpx.Invalid("body", "empty_patch")
+	}
+	changes := map[string]any{}
+	if patch.Username != nil {
+		if !usernamePattern.MatchString(*patch.Username) {
+			return httpx.Invalid("username", "invalid_format")
+		}
+		if u.Username != *patch.Username {
+			changes["username"] = map[string]string{"before": u.Username, "after": *patch.Username}
+			u.Username = *patch.Username
+		}
+	}
+	if patch.DisplayName != nil {
+		name := strings.TrimSpace(*patch.DisplayName)
 		if err := validateName(name, "display_name", 30); err != nil {
 			return err
 		}
-		result = u
-		if u.DisplayName == name {
-			return nil
+		if u.DisplayName != name {
+			changes["display_name"] = map[string]string{"before": u.DisplayName, "after": name}
+			u.DisplayName = name
 		}
-		before := u.DisplayName
-		u.DisplayName = name
-		if err := s.bump(tx, u, false); err != nil {
+	}
+	avatarChanged, err := s.bindAvatar(tx, a.User, u, patch.Avatar)
+	if err != nil {
+		return err
+	}
+	if len(changes) == 0 && !avatarChanged {
+		return nil
+	}
+	if err = s.bump(tx, u, false); err != nil {
+		return err
+	}
+	if len(changes) > 0 {
+		if err = s.audit(tx, a.User, "user.profile_updated", "user", strconv.FormatUint(u.ID, 10), u.DisplayName, meta, map[string]any{"changes": changes}); err != nil {
 			return err
 		}
-		return s.audit(tx, u, "user.profile_updated", "user", strconv.FormatUint(u.ID, 10), u.DisplayName, meta, map[string]any{"changes": map[string]any{"display_name": map[string]string{"before": before, "after": name}}})
-	})
-	return result, a, err
+	}
+	if avatarChanged {
+		return s.avatarAudit(tx, a.User, u, meta)
+	}
+	return nil
 }
 func (s *Service) SetRole(ctx context.Context, raw string, id uint64, etag, role string, meta Metadata) (*User, *Auth, error) {
 	return s.securityChange(ctx, raw, id, etag, "role", role, meta)

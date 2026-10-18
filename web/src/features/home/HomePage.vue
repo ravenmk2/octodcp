@@ -31,7 +31,7 @@ const identity = useIdentity();
         ><span class="shortcut-icon"><UiIcon name="user" /></span
         ><span
           ><strong>个人资料</strong
-          ><small>更新显示名称与查看账号资料</small></span
+          ><small>更新头像和显示名称</small></span
         ><UiIcon name="chevron"
       /></RouterLink>
       <RouterLink class="overview-shortcut" to="/account/security"

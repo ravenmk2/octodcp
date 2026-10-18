@@ -1,0 +1,128 @@
+.audit-event {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #5d6a84;
+}
+.audit-event .event-icon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  background: #f4f6fb;
+  border-radius: 7px;
+  color: #94a0b9;
+}
+.audit-event svg {
+  width: 15px;
+  height: 15px;
+}
+.audit-result {
+  font-size: 13px;
+  color: #3c8f76;
+  background: #eff8f3;
+  padding: 4px 7px;
+  border-radius: 4px;
+}
+.audit-detail {
+  margin: 0;
+  padding: 14px;
+  background: #f7f8fc;
+  border-radius: 8px;
+  font-size: 13px;
+  white-space: pre-wrap;
+  color: #65778f;
+  line-height: 1.85;
+  overflow-wrap: anywhere;
+}
+.audit-row {
+  cursor: pointer;
+}
+.activity-button {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.activity-button:hover,
+.activity-button:focus-visible {
+  background: #f7f8fd;
+}
+.audit-row:focus-within {
+  background: #f8f9ff;
+}
+.audit-event-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+.audit-target {
+  max-width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.audit-time-filter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 0 24px 18px;
+  color: #77859a;
+  font-size: 13px;
+}
+.audit-time-filter .el-date-editor {
+  max-width: 390px;
+  min-width: 240px;
+  flex: none;
+}
+.audit-time-filter small {
+  font-size: 12px;
+  color: #7d8ba0;
+}
+.audit-detail-heading {
+  font-size: 14px;
+  color: #77859a;
+  margin-bottom: 24px;
+}
+.audit-metadata {
+  margin: 0 0 25px;
+}
+.audit-changes-heading {
+  font-size: 15px;
+  margin-bottom: 12px;
+}
+.audit-empty-detail,
+.audit-loading {
+  font-size: 14px;
+  color: #77859a;
+  padding-block: 12px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+@media (max-width: 600px) {
+  .audit-time-filter {
+    padding-inline: 17px;
+  }
+  .audit-time-filter .el-date-editor {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .audit-toolbar .select-filter {
+    min-width: 150px;
+  }
+}

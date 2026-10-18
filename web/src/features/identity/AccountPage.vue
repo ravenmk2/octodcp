@@ -20,6 +20,10 @@ import {
 } from "./store";
 import UserAvatar from "../../shared/UserAvatar.vue";
 import UiIcon from "../../shared/UiIcon.vue";
+import AvatarEditor from "../media/AvatarEditor.vue";
+const avatarEditor = ref<InstanceType<typeof AvatarEditor>>();
+const avatarChange = ref<string | null>();
+const avatarProcessing = ref(false);
 const identity = useIdentity();
 const route = useRoute();
 const router = useRouter();
@@ -41,6 +45,9 @@ watch(
     passwordDialog.value = Boolean(
       identity.session?.require_password_change && security.value,
     );
+    avatarEditor.value?.reset();
+    avatarChange.value = undefined;
+    avatarProcessing.value = false;
     error.value = "";
     form.current = "";
     form.next = "";
@@ -48,7 +55,7 @@ watch(
   },
 );
 async function save() {
-  if (busy.value || !identity.user) return;
+  if (busy.value || avatarProcessing.value || !identity.user) return;
   error.value = "";
   if (security.value) {
     error.value = validatePassword(form.next);
@@ -74,8 +81,14 @@ async function save() {
       const r = await request<User>("/account", {
         method: "PATCH",
         etag: `"u-${identity.user.id}-v${identity.user.version}"`,
-        body: { display_name: form.display_name },
+        body: {
+          display_name: form.display_name,
+          ...(avatarChange.value !== undefined
+            ? { avatar_upload_id: avatarChange.value }
+            : {}),
+        },
       });
+      avatarEditor.value?.saved();
       if (identity.session) identity.session.user = r.data;
       form.display_name = r.data.display_name;
       ElMessage.success("个人资料已保存。");
@@ -159,16 +172,15 @@ onUnmounted(() => {
             <div v-if="error" class="error-banner" role="alert">
               {{ error }}
             </div>
-            <div class="avatar-editor">
-              <UserAvatar :user="identity.user" large />
-              <div class="avatar-editor-controls">
-                <h3>个人头像</h3>
-                <ElButton disabled title="头像上传与裁剪将在后续迭代中接入"
-                  >上传头像</ElButton
-                >
-                <p class="field-hint">头像上传与裁剪功能将在后续迭代中接入。</p>
-              </div>
-            </div>
+            <AvatarEditor
+              ref="avatarEditor"
+              v-model="avatarChange"
+              :avatar="identity.user.avatar"
+              :founder="identity.user.is_founder"
+              :disabled="busy"
+              label="个人头像"
+              @processing="avatarProcessing = $event"
+            />
             <ElFormItem label="显示名称" required
               ><ElInput
                 v-model="form.display_name"
@@ -184,7 +196,7 @@ onUnmounted(() => {
               type="primary"
               native-type="submit"
               :loading="busy"
-              :disabled="busy"
+              :disabled="busy || avatarProcessing"
               >保存资料</ElButton
             >
           </div>

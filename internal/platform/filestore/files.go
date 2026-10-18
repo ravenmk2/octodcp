@@ -78,3 +78,6 @@ func ReadPrivate(path string, limit int64) ([]byte, error) {
 	}
 	return os.ReadFile(path)
 }
+
+// SyncDir persists new directory entries where the platform supports it.
+func SyncDir(path string) error { return syncDirectory(path) }

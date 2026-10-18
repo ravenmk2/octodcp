@@ -16,6 +16,7 @@ import (
 	"github.com/gorilla/csrf"
 	"github.com/ravenmk2/octodcp/internal/modules/identity"
 	"github.com/ravenmk2/octodcp/internal/modules/install"
+	"github.com/ravenmk2/octodcp/internal/modules/media"
 	"github.com/ravenmk2/octodcp/internal/platform/config"
 	"github.com/ravenmk2/octodcp/internal/platform/cryptox"
 	"github.com/ravenmk2/octodcp/internal/platform/httpx"
@@ -26,11 +27,15 @@ type Options struct {
 	Installer *install.Service
 	Static    fs.FS
 	Version   string
+	Media     media.Store
 	Identity  *identity.Service
 }
 type requestIDKey struct{}
 
 func New(o Options) http.Handler {
+	if o.Media == nil {
+		o.Media = media.New(o.Runtime.DataDir)
+	}
 	if o.Identity == nil {
 		o.Identity = identity.New(func() (identity.Store, error) {
 			if store, ok := o.Installer.Backend().(identity.Store); ok {

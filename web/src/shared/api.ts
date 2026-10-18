@@ -30,7 +30,13 @@ export interface RequestOptions {
 export interface ApiResponse<T> {
   data: T;
   etag: string;
-  pagination?: { page?: number; page_size?: number; total?: number };
+  pagination?: {
+    page?: number;
+    page_size?: number;
+    total?: number;
+    next_cursor?: string | null;
+    has_more?: boolean;
+  };
 }
 
 // No credentials or installation inputs are persisted in browser storage.
@@ -59,14 +65,19 @@ export async function request<T>(
       credentials: "same-origin",
       cache: "no-store",
       headers: {
-        ...(write
-          ? { "Content-Type": "application/json", "X-CSRF-Token": csrfToken }
+        ...(write ? { "X-CSRF-Token": csrfToken } : {}),
+        ...(write && !(options.body instanceof FormData)
+          ? { "Content-Type": "application/json" }
           : {}),
         ...(options.etag ? { "If-Match": options.etag } : {}),
         ...options.headers,
       },
       body:
-        options.body === undefined ? undefined : JSON.stringify(options.body),
+        options.body === undefined
+          ? undefined
+          : options.body instanceof FormData
+            ? options.body
+            : JSON.stringify(options.body),
     });
   } catch {
     throw new ApiError("NETWORK_ERROR", "无法连接服务，请检查网络后重试。");

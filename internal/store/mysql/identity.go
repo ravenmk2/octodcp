@@ -204,7 +204,7 @@ func (t *identityTx) ListUsers(f identity.Filter) ([]identity.User, int, error) 
 	args := []any{}
 	if f.Query != "" {
 		q := strings.NewReplacer("!", "!!", "%", "!%", "_", "!_").Replace(f.Query)
-		where += " AND (username LIKE ? ESCAPE '!' OR display_name LIKE ? ESCAPE '!')"
+		where += " AND (CONVERT(username USING utf8mb4) LIKE ? ESCAPE '!' OR display_name LIKE ? ESCAPE '!')"
 		args = append(args, "%"+q+"%", "%"+q+"%")
 	}
 	if f.Status != "" {

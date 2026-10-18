@@ -12,6 +12,7 @@ const LoginPage = () => import("./features/identity/LoginPage.vue");
 const AccountPage = () => import("./features/identity/AccountPage.vue");
 const OverviewPage = () => import("./features/admin/OverviewPage.vue");
 const UsersPage = () => import("./features/admin/UsersPage.vue");
+const AuditPage = () => import("./features/admin/AuditPage.vue");
 const SettingsPage = () => import("./features/admin/SettingsPage.vue");
 import { useIdentity } from "./features/identity/store";
 import { onAuthFailure } from "./shared/api";
@@ -58,6 +59,11 @@ const router = createRouter({
       path: "/admin/users",
       component: UsersPage,
       meta: { title: "用户管理", admin: true },
+    },
+    {
+      path: "/admin/audit",
+      component: AuditPage,
+      meta: { title: "审计日志", admin: true },
     },
     {
       path: "/admin/settings",

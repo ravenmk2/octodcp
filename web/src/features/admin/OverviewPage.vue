@@ -5,6 +5,8 @@ import { ElButton } from "element-plus";
 import AppLayout from "../../app/AppLayout.vue";
 import { api } from "../../shared/api";
 import { useIdentity, errorMessage } from "../identity/store";
+import AuditDetail from "./AuditDetail.vue";
+import { actionLabels, actionIcon } from "./audit";
 interface Event {
   id: string;
   action: string;
@@ -27,21 +29,12 @@ const router = useRouter();
 const data = ref<Overview>();
 const error = ref("");
 const loading = ref(true);
-const actions: Record<string, string> = {
-  "installation.completed": "完成系统安装",
-  "auth.login_succeeded": "登录系统",
-  "auth.logged_out": "退出登录",
-  "user.created": "创建用户",
-  "user.registered": "自主注册",
-  "user.profile_updated": "更新用户资料",
-  "user.password_changed": "修改密码",
-  "user.password_reset": "重置密码",
-  "user.role_changed": "调整用户角色",
-  "user.disabled": "禁用用户",
-  "user.enabled": "启用用户",
-  "user.deleted": "删除用户",
-  "settings.updated": "更新系统设置",
-};
+const detailOpen = ref(false);
+const detailID = ref("");
+function showEvent(id: string) {
+  detailID.value = id;
+  detailOpen.value = true;
+}
 async function load() {
   loading.value = true;
   error.value = "";
@@ -126,10 +119,10 @@ onMounted(load);
             ><strong>系统设置</strong><small>系统信息与访问策略</small></span
           ><UiIcon name="chevron"
         /></RouterLink>
-        <RouterLink class="overview-shortcut" to="/admin/settings?tab=system"
-          ><span class="shortcut-icon"><UiIcon name="database" /></span
+        <RouterLink class="overview-shortcut" to="/admin/audit"
+          ><span class="shortcut-icon"><UiIcon name="log" /></span
           ><span
-            ><strong>运行信息</strong><small>应用版本与数据库连接</small></span
+            ><strong>审计日志</strong><small>关键操作与变更记录</small></span
           ><UiIcon name="chevron"
         /></RouterLink>
       </div>
@@ -140,20 +133,25 @@ onMounted(load);
               <h2>最近操作</h2>
               <p>系统近期的关键变更</p>
             </div>
-            <UiIcon name="log" />
+            <RouterLink class="overview-panel-link" to="/admin/audit"
+              >查看全部<UiIcon name="arrow"
+            /></RouterLink>
           </div>
           <div v-if="!data.recent_events.length" class="empty">
             <h3>还没有操作记录</h3>
             <p>系统的关键操作会显示在这里。</p>
           </div>
-          <div
+          <button
             v-for="event in data.recent_events"
             :key="event.id"
-            class="activity-item"
+            type="button"
+            class="activity-item activity-button"
+            @click="showEvent(event.id)"
           >
-            <span class="activity-icon"><UiIcon name="log" /></span
+            <span class="activity-icon"
+              ><UiIcon :name="actionIcon(event.action)" /></span
             ><span class="activity-copy"
-              ><strong>{{ actions[event.action] ?? event.action }}</strong
+              ><strong>{{ actionLabels[event.action] ?? event.action }}</strong
               ><span
                 >{{ event.actor.display_name
                 }}<span class="activity-dot">·</span
@@ -162,7 +160,7 @@ onMounted(load);
                 identity.date(event.occurred_at)
               }}</time></span
             >
-          </div>
+          </button>
         </section>
         <div class="overview-side">
           <section class="panel overview-access">
@@ -201,5 +199,6 @@ onMounted(load);
       </div>
     </template>
     <div v-else-if="loading" class="panel empty">正在加载概览…</div>
+    <AuditDetail v-model="detailOpen" :id="detailID" />
   </AppLayout>
 </template>

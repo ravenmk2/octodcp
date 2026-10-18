@@ -14,8 +14,11 @@ import (
 	_ "time/tzdata"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ravenmk2/octodcp/internal/modules/identity"
 	"github.com/ravenmk2/octodcp/internal/modules/install"
+	"github.com/ravenmk2/octodcp/internal/modules/media"
 	"github.com/ravenmk2/octodcp/internal/platform/config"
+	"github.com/ravenmk2/octodcp/internal/platform/httpx"
 	"github.com/ravenmk2/octodcp/internal/server"
 	"github.com/ravenmk2/octodcp/internal/store/mysql"
 	"github.com/ravenmk2/octodcp/web"
@@ -84,7 +87,14 @@ func Run(ctx context.Context, args []string, version string, out, errOut io.Writ
 		return err
 	}
 	gin.SetMode(gin.ReleaseMode)
-	handler := server.New(server.Options{Runtime: r, Installer: installer, Static: web.DistFS(), Version: version})
+	files := media.New(r.DataDir)
+	accounts := identity.New(func() (identity.Store, error) {
+		if store, ok := installer.Backend().(identity.Store); ok {
+			return store, nil
+		}
+		return nil, httpx.E(503, "INSTANCE_NOT_READY", "系统尚未就绪")
+	})
+	handler := server.New(server.Options{Runtime: r, Installer: installer, Static: web.DistFS(), Version: version, Identity: accounts, Media: files})
 	listener, err := net.Listen("tcp", r.Server.Listen)
 	if err != nil {
 		return err
@@ -92,6 +102,13 @@ func Run(ctx context.Context, args []string, version string, out, errOut io.Writ
 	httpServer := &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 150 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 32 << 10, BaseContext: func(net.Listener) context.Context { return ctx }}
 	logger := slog.New(slog.NewJSONHandler(errOut, nil))
 	logger.Info("HTTP server started", "listen", listener.Addr().String(), "version", version, "state", installer.Status(ctx).State)
+	maintenanceCtx, stopMaintenance := context.WithCancel(ctx)
+	maintenanceDone := make(chan struct{})
+	go func() {
+		defer close(maintenanceDone)
+		maintainAvatars(maintenanceCtx, installer, accounts, files, logger)
+	}()
+	defer func() { stopMaintenance(); <-maintenanceDone }()
 	stopped := make(chan struct{})
 	shutdownDone := make(chan struct{})
 	go func() {

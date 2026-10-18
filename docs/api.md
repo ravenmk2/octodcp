@@ -2,7 +2,7 @@
 
 一期 REST API 草案，基础路径 `/api/v1`。下方路径均相对此前缀，健康检查除外。规则的确认状态见 [设计入口](README.md)；本文没有邮箱字段、邮箱登录、邮件找回、项目或团队接口。
 
-目前已实现安装、认证会话、用户管理、系统设置与概览接口，以及健康探针。头像上传/读取与完整审计查询仍为待实现契约；当前资料写入不接收 `avatar_upload_id`，User.avatar 返回 null。验证边界见 [开发说明](development.md)。
+目前已实现安装、认证会话、用户管理、系统设置、概览、头像上传/读取及审计查询接口，以及健康探针。验证边界见 [开发说明](development.md)。
 
 ## 1. 协议约定
 
@@ -170,7 +170,7 @@ AuthSession.session_ttl_days 返回该会话创建时的滑动窗口，expires_a
 
 | 方法与路径 | 请求 | 成功响应 |
 | --- | --- | --- |
-| `PATCH /account` | If-Match；`{display_name}` | 200：User + ETag |
+| `PATCH /account` | If-Match；可选 `display_name`、`avatar_upload_id`，至少一项 | 200：User + ETag |
 | `PUT /account/password` | `{current_password,new_password}` | 204；撤销全部会话、清除 Cookie，重新登录 |
 | `POST /avatar-uploads` | multipart `file` | 201：`{id,preview_url,expires_at}` |
 | `DELETE /avatar-uploads/{id}` | 上传者的 staged 草稿 | 204；非本人或不存在为 404，已绑定/孤立状态为 409 |
@@ -178,7 +178,7 @@ AuthSession.session_ttl_days 返回该会话创建时的滑动窗口，expires_a
 
 本人改密时当前密码错误为 422 `CURRENT_PASSWORD_INVALID`；新旧相同为 422 `PASSWORD_UNCHANGED`，按字段返回错误码。用户名在个人接口不可写；管理员修改自己用户名使用控制台资料接口，创始人同样只能本人操作。
 
-头像上传/访问端点及下述绑定规则尚未实现。后续接入 `avatar_upload_id` 可选字段；当前提交该字段按未知字段拒绝。
+`avatar_upload_id` 省略表示不改变头像，null 表示移除，十进制 ID 字符串表示绑定草稿。数字类型、前导零及空字符串返回 422。个人设置及管理员创建/编辑用户均使用同一绑定规则；版本冲突不会消耗草稿。上传接口要求登录、正常会话及有效 CSRF，每 IP 每分钟最多 20 次，并限制并发图像处理。
 
 上传源允许 JPEG、PNG、WebP，文件大小至多 2 MiB。HTTP multipart 总大小至多 3 MiB，超过返回 413；来源图像最多 4096×4096、16,777,216 像素。服务端重新解码并统一生成 256×256 PNG，不接收 SVG、GIF 或任意附件，不相信扩展名。无效图像为 422，格式不支持为 415。
 
@@ -195,8 +195,8 @@ AuthSession.session_ttl_days 返回该会话创建时的滑动窗口，expires_a
 | `GET /admin/overview` | 无 | 200：下方概览 DTO |
 | `GET /admin/users` | 筛选和分页 | 200：User 数组 + pagination |
 | `GET /admin/users/{id}` | 无 | 200：User + ETag；已删除账号 404 |
-| `POST /admin/users` | `{username,display_name,role,password}` | 201：User + ETag + Location；强制下次改密 |
-| `PATCH /admin/users/{id}` | If-Match；`{username?,display_name?}` | 200：User + ETag；至少一项 |
+| `POST /admin/users` | `{username,display_name,role,password,avatar_upload_id?}` | 201：User + ETag + Location；强制下次改密 |
+| `PATCH /admin/users/{id}` | If-Match；`{username?,display_name?,avatar_upload_id?}` | 200：User + ETag；至少一项 |
 | `PUT /admin/users/{id}/role` | If-Match；`{role}` | 200：User + ETag；撤销目标全部会话 |
 | `PUT /admin/users/{id}/status` | If-Match；`{status}` | 200：User + ETag；启用/禁用均使既有会话失效 |
 | `PUT /admin/users/{id}/password` | If-Match；`{new_password}` | 204；撤销目标全部会话并强制下次改密 |
@@ -248,14 +248,16 @@ AuthSession.session_ttl_days 返回该会话创建时的滑动窗口，expires_a
 
 ## 8. 审计查询
 
-本节是待实现契约；当前概览已提供最近五项真实事件，尚未开放列表和详情路由。
+列表和详情仅系统管理员可查询；概览最近操作链接至同一详情与完整列表。
 
 | 方法与路径 | 参数 / 响应 |
 | --- | --- |
-| `GET /admin/audit-events` | `cursor?`、`limit` 默认 20 最大 100、`action_prefix?`、`actor_user_id?`、`target_type?`、`target_id?`、`from?`、`to?`；200 列表 |
+| `GET /admin/audit-events` | `cursor?`、`limit` 默认 20 最大 100、`q?`、`action_prefix?`、`actor_user_id?`、`target_type?`、`target_id?`、`from?`、`to?`；200 列表 |
 | `GET /admin/audit-events/{id}` | 200 单个 AuditEvent；不存在 404 |
 
 `from` 包含、`to` 不包含，必须为有效 RFC 3339；固定按 `occurred_at DESC,id DESC`。游标为不透明的编码时间+ID，校验格式；筛选变化时客户端清空游标。响应：`{"data":[],"pagination":{"next_cursor":null,"has_more":false}}`，不计算总数。没有创建、修改或删除审计的 API。
+
+`q` 最多 64 个 Unicode 码点，匹配操作者名称/用户名、对象名称、事件代码及已知事件的中文名称；`%` 和 `_` 按普通字符搜索。`action_prefix` 使用代码前缀，例如 `user.` 或 `user.avatar_changed`。页面提供关键词、事件类型和时间范围筛选；时间选择器采用浏览器时区，事件列表按系统时区显示。
 
 AuditEvent 字段：`id`、`actor:{type,user_id,username,display_name}`、`action`、`target:{type,id,label}`、`occurred_at`、`request_id`、`ip_address`、`detail`。系统事件的 user_id/username 可为空，展示名称可为“部署维护者”。详情始终经过服务端白名单生成。
 

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ravenmk2/octodcp/internal/modules/audit"
 	"github.com/ravenmk2/octodcp/internal/modules/identity"
 	"github.com/ravenmk2/octodcp/internal/modules/install"
 	"github.com/ravenmk2/octodcp/internal/modules/settings"
@@ -44,7 +45,12 @@ func optionalTime(t *time.Time) any {
 	return timestamp(*t)
 }
 func userDTO(u *identity.User, founder uint64) gin.H {
-	return gin.H{"id": strconv.FormatUint(u.ID, 10), "username": u.Username, "display_name": u.DisplayName, "role": u.Role, "is_founder": u.ID == founder, "status": u.Status, "avatar": nil, "version": strconv.FormatUint(u.Version, 10), "last_login_at": optionalTime(u.LastLoginAt), "created_at": timestamp(u.CreatedAt), "updated_at": timestamp(u.UpdatedAt)}
+	var avatar any
+	if u.AvatarID != nil {
+		id := strconv.FormatUint(*u.AvatarID, 10)
+		avatar = gin.H{"id": id, "url": "/api/v1/avatars/" + id}
+	}
+	return gin.H{"id": strconv.FormatUint(u.ID, 10), "username": u.Username, "display_name": u.DisplayName, "role": u.Role, "is_founder": u.ID == founder, "status": u.Status, "avatar": avatar, "version": strconv.FormatUint(u.Version, 10), "last_login_at": optionalTime(u.LastLoginAt), "created_at": timestamp(u.CreatedAt), "updated_at": timestamp(u.UpdatedAt)}
 }
 func authDTO(a *identity.Auth) gin.H {
 	return gin.H{"user": userDTO(a.User, a.FounderID), "expires_at": timestamp(a.Session.ExpiresAt), "session_ttl_days": a.Session.Days, "require_password_change": a.RequireChange}
@@ -54,7 +60,7 @@ func eventDTO(e identity.Event) gin.H {
 	if e.ActorID != nil {
 		id = strconv.FormatUint(*e.ActorID, 10)
 	}
-	detail := e.Detail
+	detail := audit.PublicDetail(e.Action, e.Detail)
 	if len(detail) == 0 {
 		detail = json.RawMessage(`{}`)
 	}
@@ -97,6 +103,7 @@ func registerIdentity(api *gin.RouterGroup, o Options) {
 		}
 		c.Next()
 	})
+	registerAvatarAudit(business, o)
 	business.GET("/public/settings", func(c *gin.Context) {
 		value, err := service.PublicSettings(c.Request.Context())
 		if err != nil {
@@ -170,12 +177,13 @@ func registerIdentity(api *gin.RouterGroup, o Options) {
 	})
 	business.PATCH("/account", func(c *gin.Context) {
 		var body struct {
-			DisplayName string `json:"display_name"`
+			DisplayName *string              `json:"display_name"`
+			Avatar      identity.AvatarPatch `json:"avatar_upload_id"`
 		}
-		if !httpx.Decode(c, &body) {
+		if !decodePatch(c, &body) {
 			return
 		}
-		u, a, err := service.UpdateAccount(c.Request.Context(), rawSession(c), c.GetHeader("If-Match"), body.DisplayName, metadata(c))
+		u, a, err := service.UpdateAccount(c.Request.Context(), rawSession(c), c.GetHeader("If-Match"), identity.ProfilePatch{DisplayName: body.DisplayName, Avatar: body.Avatar}, metadata(c))
 		if err != nil {
 			httpx.Write(c, err)
 			return
@@ -409,7 +417,7 @@ func decodePatch(c *gin.Context, target any) bool {
 		return false
 	}
 	for field, value := range fields {
-		if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+		if field != "avatar_upload_id" && bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
 			httpx.Write(c, httpx.Invalid(field, "invalid_value"))
 			return false
 		}

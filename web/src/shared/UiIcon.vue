@@ -25,9 +25,19 @@ defineProps<{
     | "log"
     | "lock"
     | "block"
-    | "device";
+    | "device"
+    | "minus"
+    | "rotate"
+    | "reset"
+    | "move"
+    | "close";
 }>();
 const paths = {
+  minus: "M5 12h14",
+  rotate: "M4 10a8 8 0 1 1 2 8M4 4v6h6",
+  reset: "M4 10a8 8 0 1 1 2 8M4 4v6h6m2-3v5l4 2",
+  move: "M12 3v18M3 12h18m-12-6 3-3 3 3m-6 12 3 3 3-3M6 9l-3 3 3 3m12-6 3 3-3 3",
+  close: "m6 6 12 12M6 18 18 6",
   device: "M3 4h18v12H3V4Zm5 16h8m-4-4v4",
   key: "M14 8a5 5 0 1 1-10 0 5 5 0 0 1 10 0Zm-2 4 9 9m-5-5 3-3m-1 5 3-3",
   globe:
