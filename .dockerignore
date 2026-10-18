@@ -1,0 +1,6 @@
+.git
+.agents
+.env
+data
+web/node_modules
+*.test.exe

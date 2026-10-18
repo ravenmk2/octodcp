@@ -17,6 +17,12 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
       - name: Build web frontend
         shell: bash
         run: bash scripts/build-web.sh
@@ -42,6 +48,12 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
       - name: Build web frontend
         shell: bash
         run: bash scripts/build-web.sh
@@ -49,3 +61,53 @@ jobs:
       - run: go vet ./...
 
       - run: go test ./...
+
+  mysql:
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ["8.0", "8.4"]
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:${{ matrix.version }}
+        env:
+          MYSQL_DATABASE: octodcp_test
+          MYSQL_USER: octodcp_test
+          MYSQL_PASSWORD: integration-test-only
+          MYSQL_ROOT_PASSWORD: integration-root-only
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    env:
+      OCTODCP_TEST_MYSQL_DSN: octodcp_test:integration-test-only@tcp(127.0.0.1:3306)/octodcp_test
+      OCTODCP_TEST_HTTP_MYSQL_DSN: octodcp_test:integration-test-only@tcp(127.0.0.1:3306)/octodcp_test_http
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build web frontend
+        shell: bash
+        run: bash scripts/build-web.sh
+
+      - name: Prepare separate HTTP lifecycle schema
+        run: >-
+          docker exec -e MYSQL_PWD=integration-root-only ${{ job.services.mysql.id }}
+          mysql --user=root -e "CREATE DATABASE octodcp_test_http CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+          GRANT ALL PRIVILEGES ON octodcp_test_http.* TO 'octodcp_test'@'%';"
+
+      - name: Test MySQL installation, authentication and management
+        run: go test -race -count=1 -v ./internal/store/mysql

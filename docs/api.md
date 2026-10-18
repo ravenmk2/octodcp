@@ -2,6 +2,8 @@
 
 一期 REST API 草案，基础路径 `/api/v1`。下方路径均相对此前缀，健康检查除外。规则的确认状态见 [设计入口](README.md)；本文没有邮箱字段、邮箱登录、邮件找回、项目或团队接口。
 
+目前已实现安装、认证会话、用户管理、系统设置与概览接口，以及健康探针。头像上传/读取与完整审计查询仍为待实现契约；当前资料写入不接收 `avatar_upload_id`，User.avatar 返回 null。验证边界见 [开发说明](development.md)。
+
 ## 1. 协议约定
 
 - JSON 字段为 `snake_case`，请求 `Content-Type: application/json`，头像上传单独使用 multipart。拒绝未知 JSON 字段，避免客户端提交 `role` 等未获授权字段后被静默忽略。
@@ -49,7 +51,7 @@ Cookie 名称建议为 `octodcp_session`，只承载随机会话令牌，属性�
 
 先调用 `GET /auth/csrf` 获得 `data.csrf_token`，此后所有 POST、PUT、PATCH、DELETE 都发送 `X-CSRF-Token`，包括登录、注册、安装和退出。客户端 Cookie 与该令牌配套使用；登录、退出和安装状态切换后重新获取令牌。CSRF 响应不缓存，不允许跨域通配读取。
 
-登录和注册按来源 IP 与规范用户名做有界限流；安装令牌校验单独限流。429 返回 `Retry-After`。密码哈希并发也有上限，不能只依靠请求速率限制内存消耗。
+登录和注册按来源 IP 与规范用户名做有界限流；安装写请求按来源 IP 限流。429 返回 `Retry-After`。密码哈希并发也有上限，不能只依靠请求速率限制内存消耗。
 
 未安装时只开放静态安装界面、健康检查、`/setup/*` 和 `/auth/csrf`；其余业务接口返回 503 `INSTANCE_NOT_READY`。已安装后关闭安装写接口。数据库暂时不可用返回 503，不伪装成 401 或重新安装。
 
@@ -116,16 +118,15 @@ AuthSession.session_ttl_days 返回该会话创建时的滑动窗口，expires_a
 
 ## 3. 安装接口
 
-安装会话是部署维护者身份，与用户会话分开。安装令牌由本地部署提供或生成；详细落盘、恢复与数据库锁规则见 [部署设计](deployment.md)。安装失败时不把完整连接信息返回浏览器。
+安装不需要安装令牌或安装会话。本地配置缺失或为空，且没有安装锁或其他安装痕迹时才开放向导；目标数据库为空才能执行初始化。完成后最后写入 `data/install.lock`，存在时直接跳过安装；配置或数据库异常进入维护状态。详细落盘、恢复与数据库锁规则见 [部署设计](deployment.md)。安装失败时不把完整连接信息返回浏览器。
 
 | 方法与路径 | 授权 | 请求 / 响应 |
 | --- | --- | --- |
-| `GET /setup/status` | 公开 | 200：`{state, requires_token}`；state 为五种启动状态之一，只暴露状态与通用提示 |
-| `POST /setup/session` | 未安装 + CSRF | `{setup_token}`；200：`{expires_at}`，建立 30 分钟 HttpOnly `octodcp_setup` Cookie，不返回其值 |
-| `POST /setup/database-check` | 安装会话 + CSRF | 数据库连接对象；200：`{reachable:true, compatible:true, empty_schema:true}`，失败给出有限的分类错误 |
-| `POST /setup/install` | 安装会话 + CSRF | 下方对象；201：`{installation_id,state:"ready"}`，结束安装会话，转到登录页，不自动登录创始人 |
+| `GET /setup/status` | 公开 | 200：`{state, public_url}`；五种启动状态及只读访问地址，不返回路径或连接详情 |
+| `POST /setup/database-check` | 未安装 + CSRF | 数据库连接对象；200：`{reachable:true, compatible:true, empty_schema:true}`，失败给出有限的分类错误 |
+| `POST /setup/install` | 未安装 + CSRF | 下方对象；201：`{installation_id,state:"ready",authenticated}`；写入持久化安装锁后，为提交成功请求的浏览器创建创始人会话 Cookie；前端显示 5 秒倒计时及手动按钮进入 `/home` |
 
-数据库连接对象：`{host,port,name,username,password,tls_mode}`。`port` 为 1–65535 整数；`tls_mode` 仅允许 `disabled|verify_identity`，不提供跳过证书验证模式。私有 CA 路径由部署配置给出，浏览器不能指定任意磁盘文件。检查版本、连接、专用空 schema 及初始化所需权限；不创建数据库，不接受任意 DSN 参数。
+数据库连接对象：`{host,port,name,username,password,tls_mode}`。`port` 为 1–65535 整数；`tls_mode` 仅允许 `disabled|verify_identity`，不提供跳过证书验证模式。私有 CA 路径由部署配置给出，浏览器不能指定任意磁盘文件。连接检查验证版本、连接、字符集和专用空 schema，不创建数据库，不接受任意 DSN 参数；完整 DDL/写入权限在安装执行时验证，连接检查通过不代表权限齐备。
 
 ```json
 {
@@ -148,13 +149,13 @@ AuthSession.session_ttl_days 返回该会话创建时的滑动窗口，expires_a
 
 注册默认关闭、会话默认 30 天；安装页面不提供其他业务功能。公开访问地址来自部署配置，不通过安装请求任意修改。数据库检查不持久化明文口令，最终安装请求重新携带；浏览器不在本地持久化口令。业务 JSON 体日志对这些路由禁用。
 
-重复安装请求在完成后返回 409 `ALREADY_INSTALLED`，并发安装返回 409 `INSTALL_IN_PROGRESS`。中断恢复需要本地维护命令，不提供远程“一键重置”。安装令牌错误统一为 403 `SETUP_ACCESS_DENIED`；已安装时写接口优先返回 `ALREADY_INSTALLED`，不再校验或接收旧安装令牌。
+重复安装请求在完成后返回 409 `ALREADY_INSTALLED`，并发安装返回 409 `INSTALL_IN_PROGRESS`。本地条件在操作期间变化时返回 409 `INSTALLATION_STATE_CHANGED`，随后进入维护状态；非空数据库返回 409 `DATABASE_NOT_EMPTY`。最终安装在数据库命名锁内再次检查空库。中断恢复需要本地维护命令，不提供网页“一键重置”。没有安装会话接口或专用安装 Cookie。最终成功响应可携带普通 `octodcp_session` Cookie，`authenticated=true`；会话创建失败不撤销安装，返回 `authenticated=false` 并使用正常登录。仅查询 ready 或重访安装页绝不创建创始人会话；网络中断不重放安装或补发身份。
 
 ## 4. 公开信息与认证
 
 | 方法与路径 | 请求 | 成功响应 |
 | --- | --- | --- |
-| `GET /public/settings` | 无 | 200：`{site_name,registration_enabled,session_ttl_days}`，用于访问页文案，不包含部署和数据库信息 |
+| `GET /public/settings` | 无 | 200：`{site_name,timezone,registration_enabled,session_ttl_days}`，用于访问页文案，不包含部署和数据库信息 |
 | `GET /auth/csrf` | 无 | 200：`{csrf_token}`，可在安装前调用 |
 | `POST /auth/login` | `{username,password}` | 200：AuthSession，替换现有会话 Cookie |
 | `POST /auth/register` | `{username,display_name,password}` | 201：AuthSession，固定正常普通用户，无需审批；设置会话 Cookie，前端进入 `/home` |
@@ -169,13 +170,15 @@ AuthSession.session_ttl_days 返回该会话创建时的滑动窗口，expires_a
 
 | 方法与路径 | 请求 | 成功响应 |
 | --- | --- | --- |
-| `PATCH /account` | If-Match；`{display_name?,avatar_upload_id?}`，至少一项 | 200：User + ETag |
+| `PATCH /account` | If-Match；`{display_name}` | 200：User + ETag |
 | `PUT /account/password` | `{current_password,new_password}` | 204；撤销全部会话、清除 Cookie，重新登录 |
 | `POST /avatar-uploads` | multipart `file` | 201：`{id,preview_url,expires_at}` |
 | `DELETE /avatar-uploads/{id}` | 上传者的 staged 草稿 | 204；非本人或不存在为 404，已绑定/孤立状态为 409 |
 | `GET /avatars/{id}` | 头像访问权限 | 200：图像流，或满足条件时 304，无 JSON 外壳 |
 
 本人改密时当前密码错误为 422 `CURRENT_PASSWORD_INVALID`；新旧相同为 422 `PASSWORD_UNCHANGED`，按字段返回错误码。用户名在个人接口不可写；管理员修改自己用户名使用控制台资料接口，创始人同样只能本人操作。
+
+头像上传/访问端点及下述绑定规则尚未实现。后续接入 `avatar_upload_id` 可选字段；当前提交该字段按未知字段拒绝。
 
 上传源允许 JPEG、PNG、WebP，文件大小至多 2 MiB。HTTP multipart 总大小至多 3 MiB，超过返回 413；来源图像最多 4096×4096、16,777,216 像素。服务端重新解码并统一生成 256×256 PNG，不接收 SVG、GIF 或任意附件，不相信扩展名。无效图像为 422，格式不支持为 415。
 
@@ -192,8 +195,8 @@ AuthSession.session_ttl_days 返回该会话创建时的滑动窗口，expires_a
 | `GET /admin/overview` | 无 | 200：下方概览 DTO |
 | `GET /admin/users` | 筛选和分页 | 200：User 数组 + pagination |
 | `GET /admin/users/{id}` | 无 | 200：User + ETag；已删除账号 404 |
-| `POST /admin/users` | `{username,display_name,role,password,avatar_upload_id?}` | 201：User + ETag + Location；强制下次改密 |
-| `PATCH /admin/users/{id}` | If-Match；`{username?,display_name?,avatar_upload_id?}` | 200：User + ETag；至少一项 |
+| `POST /admin/users` | `{username,display_name,role,password}` | 201：User + ETag + Location；强制下次改密 |
+| `PATCH /admin/users/{id}` | If-Match；`{username?,display_name?}` | 200：User + ETag；至少一项 |
 | `PUT /admin/users/{id}/role` | If-Match；`{role}` | 200：User + ETag；撤销目标全部会话 |
 | `PUT /admin/users/{id}/status` | If-Match；`{status}` | 200：User + ETag；启用/禁用均使既有会话失效 |
 | `PUT /admin/users/{id}/password` | If-Match；`{new_password}` | 204；撤销目标全部会话并强制下次改密 |
@@ -244,6 +247,8 @@ AuthSession.session_ttl_days 返回该会话创建时的滑动窗口，expires_a
 系统信息只供管理员查看，不返回数据库用户名、口令、DSN、主密钥内容/指纹、完整配置或环境变量。连接检测设短超时，不允许安装完成后从控制台测试任意主机。
 
 ## 8. 审计查询
+
+本节是待实现契约；当前概览已提供最近五项真实事件，尚未开放列表和详情路由。
 
 | 方法与路径 | 参数 / 响应 |
 | --- | --- |

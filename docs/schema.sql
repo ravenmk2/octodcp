@@ -1,5 +1,5 @@
 -- OctoDCP Phase A: MySQL 8+ (minimum 8.0.16) / InnoDB reference DDL.
--- Design draft only: convert into versioned goose migrations before implementation.
+-- Review reference only. Runtime migrations live in internal/store/migrations/mysql/.
 -- Run against an empty, dedicated schema. No default accounts, seed data or secrets.
 -- MySQL DDL implicitly commits; this file is not an atomic installation transaction.
 -- Application timestamps are UTC. Configure each connection with time_zone = '+00:00'.

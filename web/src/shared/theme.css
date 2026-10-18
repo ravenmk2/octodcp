@@ -1,0 +1,172 @@
+:root {
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  color: #273449;
+  background: #f6f7fa;
+  font-synthesis: none;
+  --el-color-primary: #5264e8;
+  --el-color-primary-dark-2: #4053d1;
+  --el-color-primary-light-3: #7c89ef;
+  --el-color-primary-light-5: #a2aaf3;
+  --el-color-primary-light-7: #cbd0f9;
+  --el-color-primary-light-8: #dfe3ff;
+  --el-color-primary-light-9: #eef1ff;
+  --el-text-color-primary: #273449;
+  --el-text-color-regular: #314158;
+  --el-text-color-secondary: #718096;
+  --el-text-color-placeholder: #95a0b2;
+  --el-border-color: #bcc6d6;
+  --el-border-color-light: #dce2ec;
+  --el-border-radius-base: 7px;
+  --el-font-size-base: 14px;
+  --el-color-danger: #d75260;
+  --el-color-success: #338a70;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.65;
+}
+button,
+input {
+  font: inherit;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid #a2aaf3;
+  outline-offset: 3px;
+}
+.ui-icon {
+  width: 19px;
+  height: 19px;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.el-form-item {
+  margin-bottom: 22px;
+}
+.el-form-item__label {
+  height: auto !important;
+  line-height: 1.6 !important;
+  margin-bottom: 8px !important;
+  font-size: 14px !important;
+  color: #52637a !important;
+}
+.el-form-item.is-required:not(.is-no-asterisk).asterisk-left
+  > .el-form-item__label::before {
+  display: none;
+}
+.el-form-item.is-required > .el-form-item__label::after {
+  content: "*";
+  color: var(--red);
+  margin-left: 4px;
+}
+.el-input__wrapper,
+.el-select__wrapper {
+  min-height: 44px !important;
+  border-radius: 7px !important;
+  padding-inline: 12px;
+}
+.el-input__inner,
+.el-select__selected-item {
+  font-size: 14px !important;
+  color: #3f526d;
+}
+.el-input.is-disabled .el-input__wrapper,
+.el-input:has(input[readonly]) .el-input__wrapper {
+  background: #f8f9fc;
+}
+.el-input:has(input[readonly]) .el-input__inner {
+  color: #8592a7;
+}
+.el-input-number {
+  width: 100%;
+}
+.el-input-number .el-input__inner {
+  text-align: left;
+}
+.el-select {
+  width: 100%;
+}
+.el-button {
+  min-height: 40px;
+  height: auto;
+  padding: 8px 15px;
+  gap: 7px;
+  line-height: 1.45;
+  font-weight: 500;
+}
+.el-button > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.el-button + .el-button {
+  margin-left: 0;
+}
+.el-button--primary {
+  box-shadow: 0 3px 5px #5264e817;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 18px;
+}
+.field-help {
+  font-size: 13px;
+  line-height: 1.75;
+  color: #77859a;
+  margin: -13px 0 23px;
+}
+.error-banner {
+  padding: 13px 16px;
+  border: 1px solid #ebc2c8;
+  background: #fff5f6;
+  border-radius: 8px;
+  color: #ad3949;
+  margin-bottom: 24px;
+  line-height: 1.7;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.error-banner strong {
+  font-weight: 500;
+}
+.error-banner small {
+  display: block;
+  color: #92505a;
+  font-size: 12px;
+  margin-top: 5px;
+}
+.form-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid #e4e8ef;
+  padding-top: 20px;
+  margin-top: 25px;
+}
+.loading-ring {
+  width: 42px;
+  height: 42px;
+  border: 3px solid #e1e5f8;
+  border-top-color: #5264e8;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 25px;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

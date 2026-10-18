@@ -22,6 +22,12 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
       - name: Build web frontend
         shell: bash
         run: bash scripts/build-web.sh   # real frontend output goes into the embedded binary

@@ -10,8 +10,16 @@ import (
 // real file are served directly; everything else falls back to index.html for the frontend
 // router. API routes must be registered before the SPA handler to avoid being swallowed.
 func SPAHandler(dist fs.FS) http.Handler {
+	if dist == nil {
+		return http.NotFoundHandler()
+	}
 	fileServer := http.FileServerFS(dist)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			w.Header().Set("Allow", "GET, HEAD")
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
 		p := strings.TrimPrefix(r.URL.Path, "/")
 		if f, err := dist.Open(p); err == nil {
 			st, statErr := f.Stat()
@@ -21,8 +29,13 @@ func SPAHandler(dist fs.FS) http.Handler {
 				return
 			}
 		}
-		// path missing or a directory: fall back to index.html for the frontend router
-		r.URL.Path = "/"
-		fileServer.ServeHTTP(w, r)
+		if strings.Contains(p, ".") || strings.HasPrefix(p, "assets/") {
+			http.NotFound(w, r)
+			return
+		}
+		clone := r.Clone(r.Context())
+		clone.URL.Path = "/"
+		w.Header().Set("Cache-Control", "no-store")
+		fileServer.ServeHTTP(w, clone)
 	})
 }

@@ -2,16 +2,22 @@
 package main
 
 import (
-	"log"
-	"net/http"
+	"context"
+	"log/slog"
+	"os"
+	"os/signal"
+	"syscall"
 
-	"github.com/ravenmk2/octodcp/internal/server"
+	"github.com/ravenmk2/octodcp/internal/app"
 )
 
 var version = "dev" // default when not injected; release builds inject via -ldflags "-X main.version="
 
 func main() {
-	handler := server.New()
-	log.Printf("listening on :8080 (version %s)", version)
-	log.Fatal(http.ListenAndServe(":8080", handler))
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+	if err := app.Run(ctx, os.Args[1:], version, os.Stdout, os.Stderr); err != nil {
+		slog.Error("octodcp stopped", "error", err)
+		os.Exit(1)
+	}
 }
