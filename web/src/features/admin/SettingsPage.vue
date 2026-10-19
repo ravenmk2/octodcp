@@ -173,9 +173,15 @@ onMounted(load);
                 <ElFormItem label="系统名称" required
                   ><ElInput
                     v-model="form.site_name"
+                    name="site-name"
+                    autocomplete="off"
                     maxlength="40" /></ElFormItem
                 ><ElFormItem label="访问地址"
-                  ><ElInput :model-value="publicURL" readonly
+                  ><ElInput
+                    :model-value="publicURL"
+                    name="public-url"
+                    autocomplete="off"
+                    readonly
                 /></ElFormItem>
                 <p class="field-help">
                   由部署配置指定，仅在此展示；通过配置文件或环境变量修改。

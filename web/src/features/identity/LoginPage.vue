@@ -104,13 +104,17 @@ onUnmounted(() => {
             <ElFormItem v-if="registering" label="显示名称" required
               ><ElInput
                 v-model="form.display_name"
-                autocomplete="name"
+                name="display-name"
+                autocomplete="nickname"
                 placeholder="你的姓名或常用称呼"
             /></ElFormItem>
             <ElFormItem label="用户名" required
               ><ElInput
                 v-model="form.username"
+                name="username"
                 autocomplete="username"
+                autocapitalize="none"
+                :spellcheck="false"
                 :placeholder="
                   registering ? '设置用于登录的用户名' : '请输入用户名'
                 "
@@ -118,6 +122,7 @@ onUnmounted(() => {
             <ElFormItem label="密码" required
               ><ElInput
                 v-model="form.password"
+                name="password"
                 type="password"
                 show-password
                 :autocomplete="
@@ -128,6 +133,7 @@ onUnmounted(() => {
             <ElFormItem v-if="registering" label="确认密码" required
               ><ElInput
                 v-model="form.confirm"
+                name="confirm-password"
                 type="password"
                 show-password
                 autocomplete="new-password"

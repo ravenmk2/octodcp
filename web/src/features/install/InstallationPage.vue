@@ -317,25 +317,34 @@ onUnmounted(() => {
                     :error="fieldErrors['database']"
                     ><ElInput
                       v-model="database.host"
+                      name="database-host"
                       placeholder="数据库主机地址"
                       autocomplete="off" /></ElFormItem
                   ><ElFormItem label="端口" required
                     ><ElInputNumber
                       v-model="database.port"
+                      name="database-port"
                       :min="1"
                       :max="65535"
                       :controls="false"
                   /></ElFormItem>
                 </div>
                 <ElFormItem label="数据库名称" required
-                  ><ElInput v-model="database.name" autocomplete="off"
+                  ><ElInput
+                    v-model="database.name"
+                    name="database-name"
+                    autocomplete="off"
                 /></ElFormItem>
                 <ElFormItem label="数据库用户名" required
-                  ><ElInput v-model="database.username" autocomplete="off"
+                  ><ElInput
+                    v-model="database.username"
+                    name="database-username"
+                    autocomplete="off"
                 /></ElFormItem>
                 <ElFormItem label="数据库密码"
                   ><ElInput
                     v-model="database.password"
+                    name="database-password"
                     type="password"
                     show-password
                     autocomplete="new-password"
@@ -374,10 +383,17 @@ onUnmounted(() => {
                   label="系统名称"
                   required
                   :error="fieldErrors['site.site_name']"
-                  ><ElInput v-model="site.site_name"
+                  ><ElInput
+                    v-model="site.site_name"
+                    name="site-name"
+                    autocomplete="off"
                 /></ElFormItem>
                 <ElFormItem label="访问地址"
-                  ><ElInput :model-value="status.public_url" readonly
+                  ><ElInput
+                    :model-value="status.public_url"
+                    name="public-url"
+                    autocomplete="off"
+                    readonly
                 /></ElFormItem>
                 <p class="field-help">
                   访问地址由部署配置指定，可联系部署维护者调整。
@@ -405,7 +421,10 @@ onUnmounted(() => {
                     :error="fieldErrors['founder.username']"
                     ><ElInput
                       v-model="founder.username"
+                      name="founder-username"
                       autocomplete="username"
+                      autocapitalize="none"
+                      :spellcheck="false"
                       placeholder="设置用于登录的用户名"
                   /></ElFormItem>
 
@@ -415,7 +434,8 @@ onUnmounted(() => {
                     :error="fieldErrors['founder.display_name']"
                     ><ElInput
                       v-model="founder.display_name"
-                      autocomplete="name"
+                      name="founder-display-name"
+                      autocomplete="nickname"
                       placeholder="支持中文"
                   /></ElFormItem>
                 </div>
@@ -428,6 +448,7 @@ onUnmounted(() => {
                   :error="fieldErrors['founder.password']"
                   ><ElInput
                     v-model="founder.password"
+                    name="founder-password"
                     type="password"
                     show-password
                     autocomplete="new-password"
@@ -444,6 +465,7 @@ onUnmounted(() => {
                   :error="fieldErrors.confirm"
                   ><ElInput
                     v-model="confirmPassword"
+                    name="founder-confirm-password"
                     type="password"
                     show-password
                     autocomplete="new-password"

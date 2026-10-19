@@ -262,7 +262,6 @@ onUnmounted(clearPassword);
     <div class="page-heading">
       <div>
         <h1>用户管理</h1>
-        <p>管理系统成员、账号状态与管理员身份。</p>
       </div>
       <div class="actions">
         <ElButton type="primary" @click="createUser"
@@ -271,53 +270,6 @@ onUnmounted(clearPassword);
       </div>
     </div>
     <div v-if="error" class="error-banner" role="alert">{{ error }}</div>
-    <div v-if="counts" class="stats-grid">
-      <div
-        v-for="stat in [
-          {
-            label: '全部用户',
-            value: counts.users_total,
-            description: '共同构建，更好协作',
-            icon: 'users' as const,
-            color: '',
-          },
-          {
-            label: '正常账号',
-            value: counts.users_active,
-            description: '可正常登录本系统',
-            icon: 'user' as const,
-            color: 'green',
-          },
-          {
-            label: '管理员',
-            value: counts.admins_total,
-            description: '包含 1 位创始人',
-            icon: 'shield' as const,
-            color: 'orange',
-          },
-          {
-            label: '已禁用',
-            value: counts.users_disabled,
-            description: '保留数据，暂停访问',
-            icon: 'block' as const,
-            color: 'gray',
-          },
-        ]"
-        :key="stat.label"
-        class="stat"
-      >
-        <div>
-          <div class="stat-label">{{ stat.label }}</div>
-          <div class="stat-value">
-            {{ stat.value }}<span class="stat-unit">位</span>
-          </div>
-          <div class="stat-description">{{ stat.description }}</div>
-        </div>
-        <span class="stat-icon" :class="stat.color"
-          ><UiIcon :name="stat.icon"
-        /></span>
-      </div>
-    </div>
     <section class="panel" aria-label="用户列表" :aria-busy="loading">
       <div class="tabs">
         <button
@@ -346,6 +298,8 @@ onUnmounted(clearPassword);
         <label class="search-box"
           ><UiIcon name="search" /><input
             v-model="filters.q"
+            name="user-search"
+            autocomplete="off"
             aria-label="搜索用户名或显示名称"
             placeholder="搜索用户名或显示名称…"
             @keyup.enter="search" /></label
@@ -360,8 +314,6 @@ onUnmounted(clearPassword);
           <option value="admin">管理员</option>
           <option value="user">普通用户</option></select
         ><ElButton :loading="loading" @click="search">查询</ElButton
-        ><span class="toolbar-hint"
-          ><UiIcon name="shield" />仅管理员可管理本系统用户</span
         >
       </div>
       <div v-if="users.length" class="table-scroll">
@@ -487,11 +439,6 @@ onUnmounted(clearPassword);
         </div>
       </div>
     </section>
-    <div class="info-note">
-      <UiIcon name="shield" /><span
-        >创始人账号受保护，无法删除、禁用或降级。管理员拥有相同的系统管理权限；普通用户仅可访问个人账号。</span
-      >
-    </div>
     <ElDialog
       v-model="dialog"
       class="app-dialog"
@@ -530,12 +477,17 @@ onUnmounted(clearPassword);
             <ElFormItem label="显示名称" required
               ><ElInput
                 v-model="form.display_name"
+                name="managed-display-name"
+                autocomplete="off"
                 maxlength="30"
                 placeholder="姓名或常用称呼" /></ElFormItem
             ><ElFormItem label="用户名" required
               ><ElInput
                 v-model="form.username"
+                name="managed-username"
                 autocomplete="off"
+                autocapitalize="none"
+                :spellcheck="false"
                 placeholder="设置用于登录的用户名"
             /></ElFormItem>
           </div>
@@ -572,6 +524,7 @@ onUnmounted(clearPassword);
           ><ElFormItem label="密码" required
             ><ElInput
               v-model="form.password"
+              name="managed-new-password"
               type="password"
               show-password
               autocomplete="new-password"
@@ -580,6 +533,7 @@ onUnmounted(clearPassword);
           <ElFormItem label="确认密码" required
             ><ElInput
               v-model="form.confirm"
+              name="managed-confirm-password"
               type="password"
               show-password
               autocomplete="new-password"

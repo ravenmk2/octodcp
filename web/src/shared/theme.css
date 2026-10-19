@@ -88,6 +88,35 @@ a:focus-visible {
 .el-input:has(input[readonly]) .el-input__inner {
   color: #8592a7;
 }
+/* Paint only the editable surface; Element Plus owns the outer focus/error ring.
+ * Firefox and Chromium enforce autofill background/color in their UA styles. */
+.el-input__inner,
+.search-box input {
+  --autofill-surface: #fff;
+  --autofill-text: #3f526d;
+}
+.search-box input {
+  --autofill-text: #526078;
+}
+.el-input__inner[readonly] {
+  --autofill-surface: #f8f9fc;
+  --autofill-text: #8592a7;
+}
+.el-input.is-disabled .el-input__inner {
+  --autofill-surface: #f8f9fc;
+  --autofill-text: var(--el-disabled-text-color);
+}
+.search-box input:disabled {
+  --autofill-surface: #f8f9fc;
+  --autofill-text: var(--el-disabled-text-color);
+}
+@media (forced-colors: none) {
+  :is(.el-input__inner, .search-box input):is(:autofill, :-webkit-autofill) {
+    box-shadow: 0 0 0 1000px var(--autofill-surface) inset;
+    -webkit-text-fill-color: var(--autofill-text);
+    caret-color: var(--autofill-text);
+  }
+}
 .el-input-number {
   width: 100%;
 }

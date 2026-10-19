@@ -184,9 +184,15 @@ onUnmounted(() => {
             <ElFormItem label="显示名称" required
               ><ElInput
                 v-model="form.display_name"
+                name="display-name"
+                autocomplete="nickname"
                 maxlength="30" /></ElFormItem
             ><ElFormItem label="用户名"
-              ><ElInput :model-value="identity.user.username" readonly
+              ><ElInput
+                :model-value="identity.user.username"
+                name="username"
+                autocomplete="username"
+                readonly
             /></ElFormItem>
             <p class="field-help">用户名用于登录，当前阶段由管理员维护。</p>
           </div>
@@ -291,12 +297,14 @@ onUnmounted(() => {
         ><ElFormItem label="当前密码" required
           ><ElInput
             v-model="form.current"
+            name="current-password"
             type="password"
             show-password
             autocomplete="current-password" /></ElFormItem
         ><ElFormItem label="新密码" required
           ><ElInput
             v-model="form.next"
+            name="new-password"
             type="password"
             show-password
             autocomplete="new-password"
@@ -305,6 +313,7 @@ onUnmounted(() => {
         <ElFormItem label="确认新密码" required
           ><ElInput
             v-model="form.confirm"
+            name="confirm-password"
             type="password"
             show-password
             autocomplete="new-password"
